@@ -1,0 +1,155 @@
+server:
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 120s
+  services:
+    users:
+      base_path: /users
+      versions:
+        v1:
+          url: http://localhost:8081
+          public: false
+          health:
+            enabled: true
+            upstream_path: /health
+            expects: 200
+          endpoints:
+            - name: getUser
+              method: GET
+              route: /{id}
+              upstream_path: /users/{id}
+              params:
+                - name: id
+                  type: string
+                  required: true
+              response:
+                expects: 200
+                content_type: application/json
+              cache:
+                enabled: true # Default is false
+                ttl: 60s
+            - name: listUsers
+              method: GET
+              route: /
+              upstream_path: /users
+              response:
+                expects: 200
+                content_type: application/json
+              cache:
+                enabled: true # Default is false
+                ttl: 60s
+            - name: createUser
+              method: POST
+              route: /
+              upstream_path: /users
+              response:
+                expects: 201
+                content_type: application/json
+              request:
+                allowed_content_types:
+                  - application/json
+              cache:
+                enabled: false
+                invalidates:
+                  - endpoint: listUsers
+                    wide: true
+            - name: updateUser
+              method: PUT
+              route: /{id}
+              upstream_path: /users/{id}
+              params:
+                - name: id
+                  type: string
+                  required: true
+              response:
+                expects: 200
+                content_type: application/json
+              request:
+                allowed_content_types:
+                  - application/json
+              cache:
+                enabled: false
+                invalidates:
+                  - endpoint: getUser
+                    params:
+                      id: "{id}"
+    products:
+      base_path: /products
+      versions:
+        v1:
+          url: http://localhost:8082
+          public: false
+          health:
+            enabled: true
+            upstream_path: /health
+            expects: 200
+          endpoints:
+            - name: listProducts
+              method: GET
+              route: /
+              upstream_path: /products
+              public: true
+              response:
+                content_type: application/json
+                expects: 200
+              cache:
+                enabled: true # Default is false
+                ttl: 60s
+            - name: getProduct
+              method: GET
+              route: /{product_id}
+              upstream_path: /products/{product_id}
+              public: true
+              params:
+                - name: product_id
+                  type: string
+                  required: true
+              response:
+                content_type: application/json
+                expects: 200
+              cache:
+                enabled: true # Default is false
+                ttl: 120s
+            - name: createProduct
+              method: POST
+              route: /
+              upstream_path: /products
+              response:
+                expects: 201
+                content_type: application/json
+              request:
+                allowed_content_types:
+                  - application/json
+                  - multipart/form-data
+              cache:
+                enabled: false
+                invalidates:
+                  - endpoint: listProducts
+                    wide: true
+            - name: updateProduct
+              method: PUT
+              route: /{id}
+              upstream_path: /products/{id}
+              params:
+                - name: id
+                  type: string
+                  required: true
+              response:
+                expects: 200
+                content_type: application/json
+              request:
+                allowed_content_types:
+                  - application/json
+                  - multipart/form-data
+              cache:
+                enabled: false
+                invalidates:
+                  - endpoint: getProduct
+                    params:
+                      product_id: "{id}"
+  rate_limit:
+    enabled: true
+    max_tokens: 60
+    token_refill_rate: 1
+    token_refill_interval_seconds: 1

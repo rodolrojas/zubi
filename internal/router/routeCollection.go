@@ -1,40 +1,45 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/sirupsen/logrus"
-	"rodolrojas.com/zubi/internal/common"
 	"rodolrojas.com/zubi/internal/common/structs"
 )
 
 type RouteCollection struct {
 	Routes []Route
+	HealthChecks []Route
 }
 
 func NewRouteCollection(server *structs.BaseServerConfig) *RouteCollection {
 	var collection = &RouteCollection{
 		Routes: []Route{},
+		HealthChecks: []Route{},
 	}
-	var serviceName, versionName string;
 	for i, service := range server.Services {
-		serviceName = i
+		service.Name = i;
 		for j, version := range service.Versions {
-			versionName = j
-			for _, endpoint := range version.Endpoints {
-				route, err := BuildRoute(serviceName, versionName, endpoint)
+			version.Version = j;
+			if version.Health.Enabled {
+				version.Health.Name = "health"
+				route, err := BuildRoute(&service, &version, &version.Health)
 				if err != nil {
 					continue
 				}
-				collection.AddRoute(route)
+				collection.HealthChecks = append(collection.HealthChecks, route)
+			}
+			for _, endpoint := range version.Endpoints {
+				route, err := BuildRoute(&service, &version, &endpoint)
+				if err != nil {
+					continue
+				}
+				collection.Routes = append(collection.Routes, route)
 			}
 		}
 	}
 	collection.MapCacheInvalidations()
-	common.DebugStruct(collection)
 	return collection
-}
-
-func (rc *RouteCollection) AddRoute(route Route) {
-	rc.Routes = append(rc.Routes, route)
 }
 
 func (rc *RouteCollection) FindRoute(key string) *Route {
@@ -62,4 +67,22 @@ func (rc *RouteCollection) MapCacheInvalidations() {
 			}
 		}
 	}
+}
+
+func (rc *RouteCollection) ListRoutes() {
+	var output = "Routes mapped: \n"
+	for _, route := range rc.Routes {
+		var routeInfo = fmt.Sprintf("\t\t[%s]\t%s => %s \n", route.Method, route.Path, route.Upstream)
+		output = fmt.Sprintf("%s%s", output, routeInfo)
+	}
+	logrus.Infof("%s", output)
+}
+
+func (rc *RouteCollection) ListHealthChecks() {
+	var output = "Health Checks: \n"
+	for _, route := range rc.HealthChecks {
+		var routeInfo = fmt.Sprintf("\t\t%s => %s \n", route.Key, route.Upstream)
+		output = fmt.Sprintf("%s%s", output, routeInfo)
+	}
+	logrus.Infof("%s", output)
 }

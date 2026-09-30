@@ -2,7 +2,10 @@ package router
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/sirupsen/logrus"
+	"rodolrojas.com/zubi/internal/common/enums"
 	"rodolrojas.com/zubi/internal/common/structs"
 )
 
@@ -25,21 +28,45 @@ func BuildRouteKey(service, version, endpointName string) string {
 	return fmt.Sprintf("%s:%s:%s", service, version, endpointName)
 }
 
-func BuildRoute(service, version string , endpoint structs.BaseEndpointConfig) (Route, error) {
+func BuildRoute[T *structs.BaseEndpointConfig | *structs.HealthCheckConfig](
+	service *structs.BaseServiceConfig,
+	version *structs.ServiceVersionConfig,
+	endpoint T,
+) (Route, error) {
+	var __ep structs.BaseEndpointConfig
+	var __method enums.HTTPMethod
+
+	switch v := any(endpoint).(type) {
+	case *structs.BaseEndpointConfig:
+		__ep = *v
+	case *structs.HealthCheckConfig:
+		__ep = v.BaseEndpointConfig
+	}
+	
+	if (__ep.Method == "") {
+		__method = enums.HTTPMethod("GET")
+	} else {
+		__method = enums.HTTPMethod(__ep.Method)
+		if !__method.Valid() {
+			logrus.Fatalf("%s is not an allowed method.", __method)
+		}
+	}
 	var basePath = "/api/%s/%s%s" // /api/{service}/{version}{endpoint}
-	basePath = fmt.Sprintf(basePath, service, version, endpoint.Route)
+	basePath = fmt.Sprintf(basePath, service.Name, version.Version, __ep.Route)
+	var fullUpstream = strings.TrimRight(version.URL, "/") + "/" + strings.TrimLeft(__ep.UpstreamPath, "/")
+	
 	var r = Route{
-		Key: BuildRouteKey(service, version, endpoint.Name),
-		Service: service,
-		Version: version,
-		Method: endpoint.Method,
+		Key: BuildRouteKey(service.Name, version.Version, __ep.Name),
+		Service: service.Name,
+		Version: version.Version,
+		Method: string(__method),
 		Path: basePath,
-		Public: endpoint.Public,
-		Upstream: endpoint.UpstreamPath,
-		Params: endpoint.Params,
-		CacheEnabled: endpoint.Cache.Enabled,
-		CacheTTL: int(endpoint.Cache.TTL.Seconds()),
-		CacheInvalidates: endpoint.Cache.Invalidates,
+		Public: __ep.Public,
+		Upstream: fullUpstream,
+		Params: __ep.Params,
+		CacheEnabled: __ep.Cache.Enabled,
+		CacheTTL: int(__ep.Cache.TTL.Seconds()),
+		CacheInvalidates: __ep.Cache.Invalidates,
 	}
 	return r, nil
 }

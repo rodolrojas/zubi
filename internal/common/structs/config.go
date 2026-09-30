@@ -36,7 +36,7 @@ type BaseEndpointRequestConfig struct {
 	AllowedContentTypes []string `yaml:"allowed_content_types"`
 }
 type HealthCheckConfig struct {
-	BaseEndpointConfig
+	BaseEndpointConfig `yaml:",inline"`
 	Enabled bool `yaml:"enabled"`
 }	
 type ServiceVersionConfig struct {

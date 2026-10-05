@@ -2,9 +2,12 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"rodolrojas.com/zubi/internal/common/structs"
+	"rodolrojas.com/zubi/internal/pipeline"
 )
 
 type RouteCollection struct {
@@ -38,7 +41,13 @@ func NewRouteCollection(server *structs.BaseServerConfig) *RouteCollection {
 			}
 		}
 	}
+
 	collection.MapCacheInvalidations()
+	logrus.Infof("%d routes mapped and added to gateway",int(len(collection.Routes)))
+	logrus.Infof("%d health checks detected",int(len(collection.HealthChecks)))
+	collection.ListHealthChecks()
+	collection.ListRoutes()
+
 	return collection
 }
 
@@ -85,4 +94,19 @@ func (rc *RouteCollection) ListHealthChecks() {
 		output = fmt.Sprintf("%s%s", output, routeInfo)
 	}
 	logrus.Infof("%s", output)
+}
+
+func (rc *RouteCollection) setupRoutes(handler *mux.Router) {
+	for _, route := range rc.Routes {
+		handler.HandleFunc(route.Path, NewRouteHandler(&route)).Methods(route.Method)
+	}
+	for _, healthCheck := range rc.HealthChecks {
+		handler.HandleFunc(healthCheck.Path, NewRouteHandler(&healthCheck)).Methods(healthCheck.Method)
+	}
+}
+
+func NewRouteHandler(route *Route) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		pipeline.RunRequestPipeline(w, r)
+	}
 }

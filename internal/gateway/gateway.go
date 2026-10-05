@@ -6,10 +6,8 @@ import (
 
 	"rodolrojas.com/zubi/internal/common/structs"
 	"rodolrojas.com/zubi/internal/config"
-	"rodolrojas.com/zubi/internal/httpHandler"
 	"rodolrojas.com/zubi/internal/router"
 
-	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 )
@@ -17,13 +15,11 @@ import (
 type Gateway struct {
 	config *structs.BaseServerConfig
 	router *router.Router
-	handler *mux.Router
 }
 
 func NewGateway() *Gateway {
 	cfg, err := config.LoadConfig()
 	rtr, err := router.NewRouter(cfg)
-	hnd, err := httpHandler.NewHTTPHandler()
 	if err != nil {
 		logrus.Fatal("Cannot load configuration: ", err)
 	}
@@ -31,7 +27,6 @@ func NewGateway() *Gateway {
 	return &Gateway{
 		config: cfg,
 		router: rtr,
-		handler: hnd,
 	}
 }
 
@@ -46,7 +41,7 @@ func (g *Gateway) Start() error {
 		AllowCredentials: true,
 	})
 
-	handler := c.Handler(g.handler)
+	handler := c.Handler(g.router.GetHandler())
 	
 	srv := &http.Server{
 		Handler:      handler,

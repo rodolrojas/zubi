@@ -24,6 +24,7 @@ type Route struct {
 	CacheInvalidationTargets []Route
 }
 
+
 func BuildRouteKey(service, version, endpointName string) string {
 	return fmt.Sprintf("%s:%s:%s", service, version, endpointName)
 }
